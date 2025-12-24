@@ -1,0 +1,65 @@
+{
+  "name": "@bakissation/satim",
+  "version": "1.0.0",
+  "description": "Production-grade TypeScript SDK for Satim (SATIM-IPAY) payment gateway",
+  "author": "Abdelbaki Berkati <bakissation@github>",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm run test"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.56.0",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3",
+    "undici": "^6.6.0",
+    "vitest": "^1.2.0"
+  },
+  "keywords": [
+    "satim",
+    "payment",
+    "gateway",
+    "algeria",
+    "cib",
+    "dzd",
+    "e-commerce"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bakissation/satim-ts"
+  }
+}

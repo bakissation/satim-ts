@@ -45,13 +45,13 @@ export interface SatimClient {
    * Refunds a completed transaction
    *
    * @param orderId - Order ID to refund
-   * @param amountDzd - Amount to refund in DZD (required)
+   * @param amountDzd - Amount to refund in DZD (required). Accepts number, string, or bigint.
    * @param languageOverride - Optional language override
    * @returns Refund response
    */
   refund(
     orderId: string,
-    amountDzd: number | string,
+    amountDzd: number | string | bigint,
     languageOverride?: SatimLanguage
   ): Promise<RefundOrderResponse>;
 }
@@ -69,6 +69,9 @@ interface ResolvedConfig {
   httpMethod: 'POST' | 'GET';
   timeoutMs: number;
   logger: SatimLogger | null;
+  customFetch?: (url: string, init: RequestInit) => Promise<Response>;
+  onRequest?: (endpoint: string, params: Record<string, string>) => void;
+  onResponse?: (endpoint: string, response: unknown) => void;
 }
 
 /**
@@ -96,6 +99,23 @@ function resolveConfig(config: SatimConfig): ResolvedConfig {
     config.logger?.enableDevLogging ??
     process.env['NODE_ENV'] !== 'production';
 
+  // Use custom logger if provided, otherwise create default logger
+  let logger: SatimLogger | null = null;
+  if (config.logger?.customLogger) {
+    logger = config.logger.customLogger;
+  } else if (enableLogging) {
+    logger = createLogger(config.logger?.level ?? DEFAULTS.LOG_LEVEL);
+  }
+
+  // Determine HTTP method - warn if GET is used and default to POST
+  let httpMethod: 'POST' | 'GET' = config.http?.method ?? DEFAULTS.HTTP_METHOD;
+  if (httpMethod === 'GET') {
+    logger?.warn(
+      { configuredMethod: 'GET', recommendedMethod: 'POST' },
+      'GET method is not recommended for security reasons. Credentials may appear in URLs and server logs. Consider using POST instead.'
+    );
+  }
+
   return {
     userName: config.userName,
     password: config.password,
@@ -103,11 +123,12 @@ function resolveConfig(config: SatimConfig): ResolvedConfig {
     apiBaseUrl: config.apiBaseUrl,
     language: config.language ?? DEFAULTS.LANGUAGE,
     currency: config.currency ?? DEFAULTS.CURRENCY,
-    httpMethod: config.http?.method ?? DEFAULTS.HTTP_METHOD,
+    httpMethod,
     timeoutMs: config.http?.timeoutMs ?? DEFAULTS.TIMEOUT_MS,
-    logger: enableLogging
-      ? createLogger(config.logger?.level ?? DEFAULTS.LOG_LEVEL)
-      : null,
+    logger,
+    customFetch: config.http?.fetch,
+    onRequest: config.http?.onRequest,
+    onResponse: config.http?.onResponse,
   };
 }
 
@@ -169,8 +190,12 @@ async function registerOrder(
   if (params.udf3) jsonParams.udf3 = params.udf3;
   if (params.udf4) jsonParams.udf4 = params.udf4;
   if (params.udf5) jsonParams.udf5 = params.udf5;
-  if (params.fundingTypeIndicator) {
-    jsonParams.fundingTypeIndicator = params.fundingTypeIndicator;
+
+  // Merge additionalParams if provided
+  if (params.additionalParams) {
+    for (const [key, value] of Object.entries(params.additionalParams)) {
+      jsonParams[key] = value;
+    }
   }
 
   const jsonParamsStr = JSON.stringify(jsonParams);
@@ -202,6 +227,14 @@ async function registerOrder(
   if (params.description) {
     requestParams['description'] = params.description;
   }
+  // fundingTypeIndicator is now a top-level parameter per SATIM API spec
+  if (params.fundingTypeIndicator) {
+    requestParams['fundingTypeIndicator'] = params.fundingTypeIndicator;
+  }
+  // idempotencyKey is sent as externalRequestId to prevent duplicate orders
+  if (params.idempotencyKey) {
+    requestParams['externalRequestId'] = params.idempotencyKey;
+  }
 
   // Make request
   const response = await makeRequest<RegisterOrderRawResponse>(
@@ -212,6 +245,9 @@ async function registerOrder(
       method: config.httpMethod,
       timeoutMs: config.timeoutMs,
       logger: config.logger ?? undefined,
+      fetch: config.customFetch,
+      onRequest: config.onRequest,
+      onResponse: config.onResponse,
     }
   );
 
@@ -271,6 +307,9 @@ async function confirmOrder(
       method: config.httpMethod,
       timeoutMs: config.timeoutMs,
       logger: config.logger ?? undefined,
+      fetch: config.customFetch,
+      onRequest: config.onRequest,
+      onResponse: config.onResponse,
     }
   );
 
@@ -287,11 +326,25 @@ async function confirmOrder(
     );
   }
 
+  // Extract standard fields
   const orderStatus = normalizeNumber(raw.OrderStatus, null);
   const amount = normalizeNumber(raw.Amount, null);
   const orderNumber = raw.OrderNumber ?? null;
   const pan = raw.Pan ?? null;
   const actionCodeDescription = raw.actionCodeDescription ?? null;
+
+  // Extract additional fields per SATIM API spec
+  const authorizationResponseId = raw.authorizationResponseId ?? null;
+  const approvalCode = raw.approvalCode ?? null;
+  const cardholderName = raw.cardholderName ?? null;
+  const depositAmount = normalizeNumber(raw.depositAmount, null);
+  const currency = raw.currency ?? null;
+  const description = raw.Description ?? null;
+  const ip = raw.Ip ?? null;
+  const clientId = raw.clientId ?? null;
+  const bindingId = raw.bindingId ?? null;
+  const paymentAccountReference = raw.paymentAccountReference ?? null;
+  const params = raw.params ?? null;
 
   const isSuccessful = () => errorCode === 0;
   const isPaid = () => isSuccessful() && orderStatus === 2;
@@ -304,6 +357,17 @@ async function confirmOrder(
     orderNumber,
     pan,
     actionCodeDescription,
+    authorizationResponseId,
+    approvalCode,
+    cardholderName,
+    depositAmount,
+    currency,
+    description,
+    ip,
+    clientId,
+    bindingId,
+    paymentAccountReference,
+    params,
     isSuccessful,
     isPaid,
   };
@@ -315,7 +379,7 @@ async function confirmOrder(
 async function refundOrder(
   config: ResolvedConfig,
   orderId: string,
-  amountDzd: number | string,
+  amountDzd: number | string | bigint,
   languageOverride?: SatimLanguage
 ): Promise<RefundOrderResponse> {
   if (!orderId || typeof orderId !== 'string') {
@@ -353,6 +417,9 @@ async function refundOrder(
       method: config.httpMethod,
       timeoutMs: config.timeoutMs,
       logger: config.logger ?? undefined,
+      fetch: config.customFetch,
+      onRequest: config.onRequest,
+      onResponse: config.onResponse,
     }
   );
 

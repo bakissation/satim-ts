@@ -328,4 +328,190 @@ describe('register', () => {
       expect(response.raw).toEqual(MOCK_REGISTER_SUCCESS);
     });
   });
+
+  describe('new features', () => {
+    it('should pass fundingTypeIndicator as top-level parameter', async () => {
+      let capturedBody = '';
+      const pool = mockPool(agent, 'https://test.satim.dz');
+      pool
+        .intercept({
+          path: '/payment/rest/register.do',
+          method: 'POST',
+        })
+        .reply(200, (opts) => {
+          capturedBody = opts.body as string;
+          return MOCK_REGISTER_SUCCESS;
+        }, {
+          headers: { 'content-type': 'application/json' },
+        });
+
+      const client = createSatimClient(createTestConfig());
+      await client.register({
+        orderNumber: 'ORD001',
+        amount: 5000,
+        returnUrl: 'https://merchant.com/success',
+        udf1: 'INV001',
+        fundingTypeIndicator: 'CP',
+      });
+
+      const params = parseFormBody(capturedBody);
+      // fundingTypeIndicator should be a top-level param, not in jsonParams
+      expect(params['fundingTypeIndicator']).toBe('CP');
+      const jsonParams = JSON.parse(params['jsonParams'] ?? '{}');
+      expect(jsonParams.fundingTypeIndicator).toBeUndefined();
+    });
+
+    it('should pass idempotencyKey as externalRequestId', async () => {
+      let capturedBody = '';
+      const pool = mockPool(agent, 'https://test.satim.dz');
+      pool
+        .intercept({
+          path: '/payment/rest/register.do',
+          method: 'POST',
+        })
+        .reply(200, (opts) => {
+          capturedBody = opts.body as string;
+          return MOCK_REGISTER_SUCCESS;
+        }, {
+          headers: { 'content-type': 'application/json' },
+        });
+
+      const client = createSatimClient(createTestConfig());
+      await client.register({
+        orderNumber: 'ORD001',
+        amount: 5000,
+        returnUrl: 'https://merchant.com/success',
+        udf1: 'INV001',
+        idempotencyKey: 'unique-request-id-123',
+      });
+
+      const params = parseFormBody(capturedBody);
+      expect(params['externalRequestId']).toBe('unique-request-id-123');
+    });
+
+    it('should merge additionalParams into jsonParams', async () => {
+      let capturedBody = '';
+      const pool = mockPool(agent, 'https://test.satim.dz');
+      pool
+        .intercept({
+          path: '/payment/rest/register.do',
+          method: 'POST',
+        })
+        .reply(200, (opts) => {
+          capturedBody = opts.body as string;
+          return MOCK_REGISTER_SUCCESS;
+        }, {
+          headers: { 'content-type': 'application/json' },
+        });
+
+      const client = createSatimClient(createTestConfig());
+      await client.register({
+        orderNumber: 'ORD001',
+        amount: 5000,
+        returnUrl: 'https://merchant.com/success',
+        udf1: 'INV001',
+        additionalParams: {
+          customField1: 'value1',
+          customField2: 'value2',
+        },
+      });
+
+      const params = parseFormBody(capturedBody);
+      const jsonParams = JSON.parse(params['jsonParams'] ?? '{}');
+      expect(jsonParams.customField1).toBe('value1');
+      expect(jsonParams.customField2).toBe('value2');
+      expect(jsonParams.force_terminal_id).toBe('E010TEST01');
+      expect(jsonParams.udf1).toBe('INV001');
+    });
+
+    it('should handle bigint amounts', async () => {
+      let capturedBody = '';
+      const pool = mockPool(agent, 'https://test.satim.dz');
+      pool
+        .intercept({
+          path: '/payment/rest/register.do',
+          method: 'POST',
+        })
+        .reply(200, (opts) => {
+          capturedBody = opts.body as string;
+          return MOCK_REGISTER_SUCCESS;
+        }, {
+          headers: { 'content-type': 'application/json' },
+        });
+
+      const client = createSatimClient(createTestConfig());
+      await client.register({
+        orderNumber: 'ORD001',
+        amount: 5000n, // bigint amount
+        returnUrl: 'https://merchant.com/success',
+        udf1: 'INV001',
+      });
+
+      const params = parseFormBody(capturedBody);
+      expect(params['amount']).toBe('500000'); // 5000 * 100
+    });
+
+    it('should handle large bigint amounts', async () => {
+      let capturedBody = '';
+      const pool = mockPool(agent, 'https://test.satim.dz');
+      pool
+        .intercept({
+          path: '/payment/rest/register.do',
+          method: 'POST',
+        })
+        .reply(200, (opts) => {
+          capturedBody = opts.body as string;
+          return MOCK_REGISTER_SUCCESS;
+        }, {
+          headers: { 'content-type': 'application/json' },
+        });
+
+      const client = createSatimClient(createTestConfig());
+      await client.register({
+        orderNumber: 'ORD001',
+        amount: 1000000n, // large bigint amount
+        returnUrl: 'https://merchant.com/success',
+        udf1: 'INV001',
+      });
+
+      const params = parseFormBody(capturedBody);
+      expect(params['amount']).toBe('100000000'); // 1000000 * 100
+    });
+
+    it('should combine fundingTypeIndicator, idempotencyKey, and additionalParams', async () => {
+      let capturedBody = '';
+      const pool = mockPool(agent, 'https://test.satim.dz');
+      pool
+        .intercept({
+          path: '/payment/rest/register.do',
+          method: 'POST',
+        })
+        .reply(200, (opts) => {
+          capturedBody = opts.body as string;
+          return MOCK_REGISTER_SUCCESS;
+        }, {
+          headers: { 'content-type': 'application/json' },
+        });
+
+      const client = createSatimClient(createTestConfig());
+      await client.register({
+        orderNumber: 'ORD001',
+        amount: 5000n,
+        returnUrl: 'https://merchant.com/success',
+        udf1: 'INV001',
+        fundingTypeIndicator: '698',
+        idempotencyKey: 'test-idempotency-key',
+        additionalParams: {
+          merchantData: 'extra-data',
+        },
+      });
+
+      const params = parseFormBody(capturedBody);
+      expect(params['fundingTypeIndicator']).toBe('698');
+      expect(params['externalRequestId']).toBe('test-idempotency-key');
+      expect(params['amount']).toBe('500000');
+      const jsonParams = JSON.parse(params['jsonParams'] ?? '{}');
+      expect(jsonParams.merchantData).toBe('extra-data');
+    });
+  });
 });

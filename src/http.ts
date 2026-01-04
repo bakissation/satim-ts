@@ -12,6 +12,12 @@ export interface HttpRequestOptions {
   timeoutMs: number;
   /** Logger instance */
   logger?: SatimLogger;
+  /** Custom fetch function */
+  fetch?: (url: string, init: RequestInit) => Promise<Response>;
+  /** Hook called before request */
+  onRequest?: (endpoint: string, params: Record<string, string>) => void;
+  /** Hook called after response */
+  onResponse?: (endpoint: string, response: unknown) => void;
 }
 
 /**
@@ -62,7 +68,9 @@ export async function makeRequest<T>(
   options: HttpRequestOptions
 ): Promise<HttpResponse<T>> {
   const startTime = Date.now();
-  const { method, timeoutMs, logger } = options;
+  const { method, timeoutMs, logger, onRequest, onResponse } = options;
+  // Use custom fetch if provided, otherwise use global fetch
+  const fetchFn = options.fetch ?? fetch;
 
   let url: string;
   let requestInit: RequestInit;
@@ -97,6 +105,12 @@ export async function makeRequest<T>(
   requestInit.signal = controller.signal;
 
   try {
+    // Call onRequest hook with redacted params
+    if (onRequest) {
+      const safeParams = createSafeLogData(params) as Record<string, string>;
+      onRequest(endpoint, safeParams);
+    }
+
     // Log request start (only endpoint name for safety)
     logger?.debug(
       createSafeLogData({
@@ -106,7 +120,7 @@ export async function makeRequest<T>(
       'Satim API request started'
     );
 
-    const response = await fetch(url, requestInit);
+    const response = await fetchFn(url, requestInit);
     const durationMs = Date.now() - startTime;
 
     if (!response.ok) {
@@ -127,6 +141,11 @@ export async function makeRequest<T>(
 
     // Parse JSON response
     const data = (await response.json()) as T;
+
+    // Call onResponse hook
+    if (onResponse) {
+      onResponse(endpoint, data);
+    }
 
     // Log successful response (without sensitive data)
     const logData = createSafeLogData({

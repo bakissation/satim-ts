@@ -32,3 +32,4 @@ temp/
 
 # Maintainer files
 CLAUDE.md
+.npmrc

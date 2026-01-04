@@ -27,14 +27,32 @@ export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
  * HTTP configuration options
  */
 export interface HttpConfig {
-  /** HTTP method to use (default: POST) */
+  /** HTTP method to use (default: POST). Note: GET is not recommended and will log a warning. */
   method?: HttpMethod;
   /** Request timeout in milliseconds (default: 30000) */
   timeoutMs?: number;
   /** Connection timeout in milliseconds (default: 10000) - best effort */
   connectTimeoutMs?: number;
-  /** Verify SSL certificates (default: true) */
-  verifySSL?: boolean;
+  /**
+   * Custom fetch function for making HTTP requests.
+   * Use this to integrate with custom HTTP clients or add middleware.
+   * If not provided, the global fetch is used.
+   */
+  fetch?: (url: string, init: RequestInit) => Promise<Response>;
+  /**
+   * Hook called before each request is sent.
+   * Useful for logging, metrics, or request modification.
+   * @param endpoint - The API endpoint being called
+   * @param params - The request parameters (sensitive data redacted)
+   */
+  onRequest?: (endpoint: string, params: Record<string, string>) => void;
+  /**
+   * Hook called after each response is received.
+   * Useful for logging, metrics, or response inspection.
+   * @param endpoint - The API endpoint that was called
+   * @param response - The parsed response data
+   */
+  onResponse?: (endpoint: string, response: unknown) => void;
 }
 
 /**
@@ -45,6 +63,21 @@ export interface LoggerConfig {
   enableDevLogging?: boolean;
   /** Log level (default: 'info') */
   level?: LogLevel;
+  /**
+   * Custom logger instance implementing SatimLogger interface.
+   * Use this to integrate with logging frameworks like winston, pino, or bunyan.
+   * When provided, this takes precedence over enableDevLogging and level.
+   *
+   * @example
+   * // Using with a rotating logger
+   * const rotatingLogger: SatimLogger = {
+   *   debug: (obj, msg) => myLogger.debug({ ...obj, timestamp: Date.now() }, msg),
+   *   info: (obj, msg) => myLogger.info({ ...obj, timestamp: Date.now() }, msg),
+   *   warn: (obj, msg) => myLogger.warn({ ...obj, timestamp: Date.now() }, msg),
+   *   error: (obj, msg) => myLogger.error({ ...obj, timestamp: Date.now() }, msg),
+   * };
+   */
+  customLogger?: SatimLogger;
 }
 
 /**
@@ -85,8 +118,8 @@ export interface RegisterJsonParams {
   udf4?: string;
   /** User defined field 5 - optional */
   udf5?: string;
-  /** Payment Transaction Type Indicator (e.g., 'CP' or '698' for bill payment) */
-  fundingTypeIndicator?: string;
+  /** Additional merchant-specific parameters */
+  [key: string]: string | undefined;
 }
 
 /**
@@ -95,8 +128,8 @@ export interface RegisterJsonParams {
 export interface RegisterOrderParams {
   /** Order number in the merchant's system - must be unique per transaction */
   orderNumber: string;
-  /** Amount in DZD (minimum 50 DZD) - will be converted to minor units */
-  amount: number | string;
+  /** Amount in DZD (minimum 50 DZD) - will be converted to minor units. Accepts number, string, or bigint. */
+  amount: number | string | bigint;
   /** URL to redirect after successful payment */
   returnUrl: string;
   /** URL to redirect if payment failed */
@@ -117,8 +150,22 @@ export interface RegisterOrderParams {
   udf4?: string;
   /** User defined field 5 - optional */
   udf5?: string;
-  /** Payment Transaction Type Indicator */
+  /**
+   * Payment Transaction Type Indicator (e.g., 'CP' or '698' for bill payment).
+   * Passed as a top-level request parameter per SATIM API specification.
+   */
   fundingTypeIndicator?: string;
+  /**
+   * Additional merchant-specific parameters to include in jsonParams.
+   * These key-value pairs are merged with the standard jsonParams fields.
+   */
+  additionalParams?: Record<string, string>;
+  /**
+   * Idempotency key to prevent duplicate orders.
+   * Pass a unique value (e.g., UUID) to ensure the same order isn't created twice.
+   * Sent as 'externalRequestId' in the API request.
+   */
+  idempotencyKey?: string;
 }
 
 /**
@@ -219,6 +266,28 @@ export interface ConfirmOrderResponse {
   pan: string | null;
   /** Action code description */
   actionCodeDescription: string | null;
+  /** Authorization response ID */
+  authorizationResponseId: string | null;
+  /** IPS authorization/approval code */
+  approvalCode: string | null;
+  /** Name of the cardholder */
+  cardholderName: string | null;
+  /** Amount to be debited in order currency */
+  depositAmount: number | null;
+  /** Currency code */
+  currency: string | null;
+  /** Order description */
+  description: string | null;
+  /** Customer IP address */
+  ip: string | null;
+  /** Customer ID in merchant system */
+  clientId: string | null;
+  /** Binding ID */
+  bindingId: string | null;
+  /** Payment account reference */
+  paymentAccountReference: string | null;
+  /** Additional parameters from response */
+  params: Record<string, unknown> | null;
   /** Check if confirmation was successful */
   isSuccessful(): boolean;
   /** Check if order was paid (status 2) */

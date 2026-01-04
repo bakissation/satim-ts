@@ -303,4 +303,190 @@ describe('confirm', () => {
       expect(response.raw.cardholderName).toBe('TEST USER');
     });
   });
+
+  describe('extended response fields', () => {
+    it('should expose authorizationResponseId', async () => {
+      const pool = mockPool(agent, 'https://test.satim.dz');
+      pool
+        .intercept({
+          path: '/payment/rest/public/acknowledgeTransaction.do',
+          method: 'POST',
+        })
+        .reply(200, MOCK_CONFIRM_SUCCESS, {
+          headers: { 'content-type': 'application/json' },
+        });
+
+      const client = createSatimClient(createTestConfig());
+      const response = await client.confirm('V721uPPfNNofVQAAABL3');
+
+      expect(response.authorizationResponseId).toBe('913180');
+    });
+
+    it('should expose approvalCode', async () => {
+      const pool = mockPool(agent, 'https://test.satim.dz');
+      pool
+        .intercept({
+          path: '/payment/rest/public/acknowledgeTransaction.do',
+          method: 'POST',
+        })
+        .reply(200, MOCK_CONFIRM_SUCCESS, {
+          headers: { 'content-type': 'application/json' },
+        });
+
+      const client = createSatimClient(createTestConfig());
+      const response = await client.confirm('V721uPPfNNofVQAAABL3');
+
+      expect(response.approvalCode).toBe('913180');
+    });
+
+    it('should expose cardholderName', async () => {
+      const pool = mockPool(agent, 'https://test.satim.dz');
+      pool
+        .intercept({
+          path: '/payment/rest/public/acknowledgeTransaction.do',
+          method: 'POST',
+        })
+        .reply(200, MOCK_CONFIRM_SUCCESS, {
+          headers: { 'content-type': 'application/json' },
+        });
+
+      const client = createSatimClient(createTestConfig());
+      const response = await client.confirm('V721uPPfNNofVQAAABL3');
+
+      expect(response.cardholderName).toBe('TEST USER');
+    });
+
+    it('should expose depositAmount', async () => {
+      const pool = mockPool(agent, 'https://test.satim.dz');
+      pool
+        .intercept({
+          path: '/payment/rest/public/acknowledgeTransaction.do',
+          method: 'POST',
+        })
+        .reply(200, MOCK_CONFIRM_SUCCESS, {
+          headers: { 'content-type': 'application/json' },
+        });
+
+      const client = createSatimClient(createTestConfig());
+      const response = await client.confirm('V721uPPfNNofVQAAABL3');
+
+      expect(response.depositAmount).toBe(100320);
+    });
+
+    it('should expose currency', async () => {
+      const pool = mockPool(agent, 'https://test.satim.dz');
+      pool
+        .intercept({
+          path: '/payment/rest/public/acknowledgeTransaction.do',
+          method: 'POST',
+        })
+        .reply(200, MOCK_CONFIRM_SUCCESS, {
+          headers: { 'content-type': 'application/json' },
+        });
+
+      const client = createSatimClient(createTestConfig());
+      const response = await client.confirm('V721uPPfNNofVQAAABL3');
+
+      expect(response.currency).toBe('012');
+    });
+
+    it('should expose ip', async () => {
+      const pool = mockPool(agent, 'https://test.satim.dz');
+      pool
+        .intercept({
+          path: '/payment/rest/public/acknowledgeTransaction.do',
+          method: 'POST',
+        })
+        .reply(200, MOCK_CONFIRM_SUCCESS, {
+          headers: { 'content-type': 'application/json' },
+        });
+
+      const client = createSatimClient(createTestConfig());
+      const response = await client.confirm('V721uPPfNNofVQAAABL3');
+
+      expect(response.ip).toBe('10.12.12.14');
+    });
+
+    it('should expose params object', async () => {
+      const pool = mockPool(agent, 'https://test.satim.dz');
+      pool
+        .intercept({
+          path: '/payment/rest/public/acknowledgeTransaction.do',
+          method: 'POST',
+        })
+        .reply(200, MOCK_CONFIRM_SUCCESS, {
+          headers: { 'content-type': 'application/json' },
+        });
+
+      const client = createSatimClient(createTestConfig());
+      const response = await client.confirm('V721uPPfNNofVQAAABL3');
+
+      expect(response.params).toEqual({
+        respCode_desc: 'Votre paiement a été accepté',
+        udf1: 'Bill00001',
+        respCode: '00',
+      });
+    });
+
+    it('should handle null values for optional fields', async () => {
+      const pool = mockPool(agent, 'https://test.satim.dz');
+      pool
+        .intercept({
+          path: '/payment/rest/public/acknowledgeTransaction.do',
+          method: 'POST',
+        })
+        .reply(200, {
+          ErrorCode: 0,
+          OrderStatus: 2,
+          OrderNumber: 'CMD001',
+          Amount: 5000,
+        }, {
+          headers: { 'content-type': 'application/json' },
+        });
+
+      const client = createSatimClient(createTestConfig());
+      const response = await client.confirm('V721uPPfNNofVQAAABL3');
+
+      expect(response.isSuccessful()).toBe(true);
+      expect(response.authorizationResponseId).toBeNull();
+      expect(response.approvalCode).toBeNull();
+      expect(response.cardholderName).toBeNull();
+      expect(response.depositAmount).toBeNull();
+      expect(response.currency).toBeNull();
+      expect(response.description).toBeNull();
+      expect(response.ip).toBeNull();
+      expect(response.clientId).toBeNull();
+      expect(response.bindingId).toBeNull();
+      expect(response.paymentAccountReference).toBeNull();
+      expect(response.params).toBeNull();
+    });
+
+    it('should expose all extended fields together', async () => {
+      const extendedResponse = {
+        ...MOCK_CONFIRM_SUCCESS,
+        clientId: 'CLIENT123',
+        bindingId: 'BINDING456',
+        paymentAccountReference: 'PAR789',
+        Description: 'Test order description',
+      };
+
+      const pool = mockPool(agent, 'https://test.satim.dz');
+      pool
+        .intercept({
+          path: '/payment/rest/public/acknowledgeTransaction.do',
+          method: 'POST',
+        })
+        .reply(200, extendedResponse, {
+          headers: { 'content-type': 'application/json' },
+        });
+
+      const client = createSatimClient(createTestConfig());
+      const response = await client.confirm('V721uPPfNNofVQAAABL3');
+
+      expect(response.clientId).toBe('CLIENT123');
+      expect(response.bindingId).toBe('BINDING456');
+      expect(response.paymentAccountReference).toBe('PAR789');
+      expect(response.description).toBe('Test order description');
+    });
+  });
 });

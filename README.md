@@ -7,10 +7,13 @@ Production-grade TypeScript SDK for the Satim (SATIM-IPAY) payment gateway in Al
 - Full TypeScript support with strict types
 - ESM and CommonJS builds
 - Minimal dependencies (uses native `fetch`)
-- Secure by default: credentials never logged
+- Secure by default: credentials never logged, TLS always enforced
 - Fully configurable via environment variables
 - Comprehensive error handling
-- Amount conversion utilities
+- Amount conversion utilities (supports `number`, `string`, and `bigint`)
+- Pluggable fetch and middleware hooks for custom integrations
+- Idempotency key support to prevent duplicate orders
+- Custom logger support for integration with logging frameworks
 
 ## Installation
 
@@ -106,12 +109,13 @@ All configuration can be set via environment variables with the `SATIM_` prefix.
 |----------|-------------|---------|
 | `SATIM_LANGUAGE` | Payment page language (`fr`, `en`, `ar`) | `fr` |
 | `SATIM_CURRENCY` | Currency code (ISO 4217) | `012` (DZD) |
-| `SATIM_HTTP_METHOD` | HTTP method (`POST`, `GET`) | `POST` |
+| `SATIM_HTTP_METHOD` | HTTP method (`POST`, `GET`). **GET not recommended.** | `POST` |
 | `SATIM_HTTP_TIMEOUT_MS` | Request timeout (ms) | `30000` |
 | `SATIM_HTTP_CONNECT_TIMEOUT_MS` | Connection timeout (ms) | `10000` |
-| `SATIM_HTTP_VERIFY_SSL` | Verify SSL certificates | `true` |
 | `SATIM_LOG_LEVEL` | Log level (`debug`, `info`, `warn`, `error`) | `info` |
 | `SATIM_LOG_DEV` | Enable dev logging | `true` (if NODE_ENV !== production) |
+
+> **Note:** TLS is always enforced for security. The `SATIM_HTTP_VERIFY_SSL` environment variable has been removed.
 
 ### Custom Prefix
 
@@ -147,6 +151,120 @@ const client = createSatimClient({
 });
 ```
 
+## Advanced Configuration
+
+### Custom Fetch Function
+
+Provide a custom fetch function for advanced HTTP handling (e.g., proxies, custom TLS, testing):
+
+```typescript
+import { createSatimClient } from '@bakissation/satim';
+
+const client = createSatimClient({
+  userName: 'your_username',
+  password: 'your_password',
+  terminalId: 'E010XXXXXX',
+  apiBaseUrl: 'https://satim.dz/payment/rest',
+  http: {
+    fetch: async (url, init) => {
+      // Custom fetch implementation
+      console.log('Requesting:', url);
+      return fetch(url, {
+        ...init,
+        // Add custom headers, proxy settings, etc.
+      });
+    },
+  },
+});
+```
+
+### Middleware Hooks
+
+Use `onRequest` and `onResponse` hooks for logging, metrics, or debugging:
+
+```typescript
+const client = createSatimClient({
+  userName: 'your_username',
+  password: 'your_password',
+  terminalId: 'E010XXXXXX',
+  apiBaseUrl: 'https://satim.dz/payment/rest',
+  http: {
+    onRequest: (endpoint, params) => {
+      console.log(`[REQUEST] ${endpoint}`, params);
+      // Note: sensitive data is automatically redacted
+    },
+    onResponse: (endpoint, response) => {
+      console.log(`[RESPONSE] ${endpoint}`, response);
+    },
+  },
+});
+```
+
+### Custom Logger
+
+Integrate with your logging framework (winston, pino, bunyan, etc.):
+
+```typescript
+import { createSatimClient, SatimLogger } from '@bakissation/satim';
+import pino from 'pino';
+
+const pinoLogger = pino({ level: 'debug' });
+
+// Create a SatimLogger adapter
+const customLogger: SatimLogger = {
+  debug: (obj, msg) => pinoLogger.debug(obj, msg),
+  info: (obj, msg) => pinoLogger.info(obj, msg),
+  warn: (obj, msg) => pinoLogger.warn(obj, msg),
+  error: (obj, msg) => pinoLogger.error(obj, msg),
+};
+
+const client = createSatimClient({
+  userName: 'your_username',
+  password: 'your_password',
+  terminalId: 'E010XXXXXX',
+  apiBaseUrl: 'https://satim.dz/payment/rest',
+  logger: {
+    customLogger,
+  },
+});
+```
+
+#### Rotating Logger Example
+
+For production environments with log rotation:
+
+```typescript
+import { createSatimClient, SatimLogger } from '@bakissation/satim';
+import winston from 'winston';
+import 'winston-daily-rotate-file';
+
+const transport = new winston.transports.DailyRotateFile({
+  filename: 'logs/satim-%DATE%.log',
+  datePattern: 'YYYY-MM-DD',
+  maxSize: '20m',
+  maxFiles: '14d',
+});
+
+const winstonLogger = winston.createLogger({
+  transports: [transport],
+});
+
+const customLogger: SatimLogger = {
+  debug: (obj, msg) => winstonLogger.debug(msg || '', obj),
+  info: (obj, msg) => winstonLogger.info(msg || '', obj),
+  warn: (obj, msg) => winstonLogger.warn(msg || '', obj),
+  error: (obj, msg) => winstonLogger.error(msg || '', obj),
+};
+
+const client = createSatimClient({
+  userName: process.env.SATIM_USERNAME!,
+  password: process.env.SATIM_PASSWORD!,
+  terminalId: process.env.SATIM_TERMINAL_ID!,
+  apiBaseUrl: 'https://satim.dz/payment/rest',
+  logger: { customLogger },
+});
+```
+
 ## API Reference
 
 ### Register Order
@@ -156,7 +274,7 @@ Creates a new payment order.
 ```typescript
 const response = await client.register({
   orderNumber: 'ORD001',     // Required: unique order ID (max 10 chars)
-  amount: 5000,               // Required: amount in DZD (min 50 DZD)
+  amount: 5000,               // Required: amount in DZD (min 50 DZD). Also accepts string or bigint (e.g., 5000n)
   returnUrl: 'https://...',   // Required: success redirect URL
   failUrl: 'https://...',     // Optional: failure redirect URL
   description: 'Order desc',  // Optional: order description
@@ -167,13 +285,50 @@ const response = await client.register({
   udf5: 'Extra4',            // Optional
   language: 'fr',            // Optional: override default language
   currency: '012',           // Optional: override default currency
-  fundingTypeIndicator: 'CP', // Optional: 'CP' or '698' for bill payment
+  fundingTypeIndicator: 'CP', // Optional: 'CP' or '698' for bill payment (top-level param)
+  idempotencyKey: 'uuid-...',  // Optional: unique key to prevent duplicate orders
+  additionalParams: {         // Optional: custom params for jsonParams
+    customField: 'value',
+  },
 });
 
 if (response.isSuccessful()) {
   console.log('Order ID:', response.orderId);
   console.log('Payment URL:', response.formUrl);
 }
+```
+
+#### Idempotency Key
+
+Use `idempotencyKey` to prevent duplicate order creation. Pass a unique value (e.g., UUID) for each order request. The SDK sends this as `externalRequestId` to the Satim API.
+
+```typescript
+import { randomUUID } from 'crypto';
+
+const response = await client.register({
+  orderNumber: 'ORD001',
+  amount: 5000,
+  returnUrl: 'https://yoursite.com/success',
+  udf1: 'INV001',
+  idempotencyKey: randomUUID(), // Prevents duplicate orders on retry
+});
+```
+
+#### Additional Parameters
+
+Use `additionalParams` to include merchant-specific fields in the `jsonParams` payload:
+
+```typescript
+const response = await client.register({
+  orderNumber: 'ORD001',
+  amount: 5000,
+  returnUrl: 'https://yoursite.com/success',
+  udf1: 'INV001',
+  additionalParams: {
+    merchantRef: 'M123',
+    customerId: 'C456',
+  },
+});
 ```
 
 ### Confirm Order
@@ -190,12 +345,24 @@ if (response.isSuccessful()) {
     console.log('Order Status:', response.orderStatus); // 2 = paid
     console.log('Amount:', response.amount);
     console.log('Card:', response.pan); // Masked: 6280****7215
+
+    // Additional fields available in normalized response
+    console.log('Cardholder:', response.cardholderName);
+    console.log('Approval Code:', response.approvalCode);
+    console.log('Authorization ID:', response.authorizationResponseId);
+    console.log('Deposit Amount:', response.depositAmount);
+    console.log('Currency:', response.currency);
+    console.log('Description:', response.description);
+    console.log('Client IP:', response.ip);
+    console.log('Client ID:', response.clientId);
+    console.log('Binding ID:', response.bindingId);
+    console.log('Payment Account Ref:', response.paymentAccountReference);
+    console.log('Extra Params:', response.params);
   }
 }
 
-// Access raw response for additional fields
-console.log(response.raw.cardholderName);
-console.log(response.raw.approvalCode);
+// Access raw response for all fields
+console.log(response.raw);
 ```
 
 ### Refund Order
@@ -212,23 +379,41 @@ if (response.isSuccessful()) {
 
 ## Amount Handling
 
-Amounts are provided in DZD and automatically converted to minor units (x100).
+Amounts are provided in DZD and automatically converted to minor units (x100). The SDK accepts `number`, `string`, or `bigint` values.
 
 ```typescript
 import { toMinorUnits, fromMinorUnits } from '@bakissation/satim';
 
-// Conversion utilities
+// Conversion utilities - supports number, string, and bigint
 toMinorUnits(5000);     // "500000"
 toMinorUnits('806.5');  // "80650"
 toMinorUnits('50.01');  // "5001"
+toMinorUnits(5000n);    // "500000" (bigint support)
 
 fromMinorUnits(500000); // 5000
 fromMinorUnits(80650);  // 806.5
 
 // Validation rules:
 // - Minimum: 50 DZD
-// - Maximum 2 decimal places
+// - Maximum 2 decimal places (for number/string)
 // - Non-negative
+```
+
+### BigInt Support
+
+For applications dealing with large amounts or requiring precise integer arithmetic, use `bigint`:
+
+```typescript
+// Register with bigint amount
+const response = await client.register({
+  orderNumber: 'ORD001',
+  amount: 1000000n, // 1,000,000 DZD as bigint
+  returnUrl: 'https://yoursite.com/success',
+  udf1: 'LARGE_ORDER',
+});
+
+// Refund with bigint
+await client.refund(orderId, 500000n); // 500,000 DZD as bigint
 ```
 
 ## Error Handling
@@ -304,13 +489,17 @@ OrderStatus.DECLINED             // 6
 
 2. **Always verify server-side**: Never trust client-side payment callbacks. Always call `confirm()` from your server.
 
-3. **Use POST method**: The default `POST` method prevents credentials from appearing in URLs and logs.
+3. **Use POST method**: The default `POST` method prevents credentials from appearing in URLs and logs. Using `GET` will log a warning.
 
-4. **Environment variables**: Store credentials in environment variables, never in code. See `.env.example`.
+4. **TLS always enforced**: The SDK always verifies TLS certificates. This is not configurable for security reasons.
 
-5. **Never commit `.env`**: Add `.env` to your `.gitignore`.
+5. **Environment variables**: Store credentials in environment variables, never in code. See `.env.example`.
 
-6. **Disable dev logging in production**: Set `NODE_ENV=production` or `SATIM_LOG_DEV=false`.
+6. **Never commit `.env`**: Add `.env` to your `.gitignore`.
+
+7. **Disable dev logging in production**: Set `NODE_ENV=production` or `SATIM_LOG_DEV=false`.
+
+8. **Use idempotency keys**: Use `idempotencyKey` in `register()` to prevent duplicate orders on retries.
 
 ## Test Cards
 

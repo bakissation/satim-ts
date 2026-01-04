@@ -5,7 +5,7 @@ import { VALIDATION } from './constants.js';
  * Converts an amount in DZD to minor units (multiply by 100)
  * Uses string-based parsing to avoid floating-point errors
  *
- * @param amount - Amount in DZD (e.g., 806.5, "5000", "806.50")
+ * @param amount - Amount in DZD (e.g., 806.5, "5000", "806.50", 5000n)
  * @returns Amount in minor units as string
  * @throws ValidationError if amount is invalid
  *
@@ -14,8 +14,26 @@ import { VALIDATION } from './constants.js';
  * toMinorUnits("806.5") => "80650"
  * toMinorUnits("806.50") => "80650"
  * toMinorUnits(50) => "5000"
+ * toMinorUnits(5000n) => "500000"
  */
-export function toMinorUnits(amount: number | string): string {
+export function toMinorUnits(amount: number | string | bigint): string {
+  // Handle bigint directly - multiply by 100n and return string
+  if (typeof amount === 'bigint') {
+    if (amount < 0n) {
+      throw new ValidationError('Amount must be non-negative', 'INVALID_AMOUNT', {
+        value: amount.toString(),
+      });
+    }
+    if (amount < BigInt(VALIDATION.MIN_AMOUNT_DZD)) {
+      throw new ValidationError(
+        `Amount must be at least ${VALIDATION.MIN_AMOUNT_DZD} DZD`,
+        'INVALID_AMOUNT',
+        { value: amount.toString(), minimum: VALIDATION.MIN_AMOUNT_DZD }
+      );
+    }
+    return (amount * 100n).toString();
+  }
+
   // Convert to string for consistent parsing
   const amountStr = typeof amount === 'number' ? amount.toString() : amount;
 
@@ -139,10 +157,10 @@ export function fromMinorUnits(minorUnits: number | string): number {
 /**
  * Validates an amount without converting
  *
- * @param amount - Amount to validate
+ * @param amount - Amount to validate (number, string, or bigint)
  * @returns true if valid, throws otherwise
  */
-export function validateAmount(amount: number | string): boolean {
+export function validateAmount(amount: number | string | bigint): boolean {
   toMinorUnits(amount); // Will throw if invalid
   return true;
 }

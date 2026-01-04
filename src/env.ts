@@ -77,7 +77,7 @@ export function fromEnv(options: FromEnvOptions = {}): SatimConfig {
     getVar(ENV_VARS.HTTP_CONNECT_TIMEOUT_MS),
     DEFAULTS.CONNECT_TIMEOUT_MS
   );
-  const verifySSL = parseBoolean(getVar(ENV_VARS.HTTP_VERIFY_SSL), DEFAULTS.VERIFY_SSL);
+  // Note: verifySSL is no longer configurable - TLS is always enforced for security
 
   // Parse logger config
   const logLevel = parseLogLevel(getVar(ENV_VARS.LOG_LEVEL));
@@ -97,7 +97,7 @@ export function fromEnv(options: FromEnvOptions = {}): SatimConfig {
       method: httpMethod,
       timeoutMs,
       connectTimeoutMs,
-      verifySSL,
+      // Note: verifySSL removed - TLS is always enforced
     },
     logger: {
       level: logLevel,

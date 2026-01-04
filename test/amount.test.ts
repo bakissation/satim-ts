@@ -114,6 +114,43 @@ describe('toMinorUnits', () => {
       expect(() => toMinorUnits('0.50')).toThrow('at least 50 DZD');
     });
   });
+
+  describe('bigint support', () => {
+    it('should convert bigint whole number amount', () => {
+      expect(toMinorUnits(5000n)).toBe('500000');
+    });
+
+    it('should convert minimum bigint amount (50n DZD)', () => {
+      expect(toMinorUnits(50n)).toBe('5000');
+    });
+
+    it('should convert large bigint amounts', () => {
+      expect(toMinorUnits(999999n)).toBe('99999900');
+    });
+
+    it('should convert very large bigint amounts', () => {
+      expect(toMinorUnits(1000000000n)).toBe('100000000000');
+    });
+
+    it('should throw for negative bigint', () => {
+      expect(() => toMinorUnits(-100n)).toThrow(ValidationError);
+      expect(() => toMinorUnits(-100n)).toThrow('non-negative');
+    });
+
+    it('should throw for bigint below minimum (50 DZD)', () => {
+      expect(() => toMinorUnits(49n)).toThrow(ValidationError);
+      expect(() => toMinorUnits(49n)).toThrow('at least 50 DZD');
+    });
+
+    it('should have correct error code for bigint validation', () => {
+      try {
+        toMinorUnits(-100n);
+      } catch (error) {
+        expect(error).toBeInstanceOf(ValidationError);
+        expect((error as ValidationError).code).toBe('INVALID_AMOUNT');
+      }
+    });
+  });
 });
 
 describe('fromMinorUnits', () => {
@@ -141,5 +178,13 @@ describe('validateAmount', () => {
 
   it('should throw for invalid amount', () => {
     expect(() => validateAmount(-100)).toThrow(ValidationError);
+  });
+
+  it('should return true for valid bigint amount', () => {
+    expect(validateAmount(5000n)).toBe(true);
+  });
+
+  it('should throw for invalid bigint amount', () => {
+    expect(() => validateAmount(-100n)).toThrow(ValidationError);
   });
 });

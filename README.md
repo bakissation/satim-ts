@@ -551,4 +551,6 @@ npm run build
 
 ## Author
 
-**Abdelbaki Berkati** ([@bakissation](https://github.com/bakissation))
+**Abdelbaki Berkati** — [berkati.xyz](https://berkati.xyz) · [@bakissation](https://github.com/bakissation)
+
+[Read the case study →](https://berkati.xyz/case-studies/satim-ts-payments-sdk/)

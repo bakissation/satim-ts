@@ -42,6 +42,33 @@ export interface SatimClient {
   ): Promise<ConfirmOrderResponse>;
 
   /**
+   * Gets the current status of an order
+   *
+   * This is an alias for `confirm()` that provides a more intuitive name
+   * when you want to check an order's payment status without necessarily
+   * "confirming" it. Both methods call the same SATIM endpoint
+   * (acknowledgeTransaction.do) and return identical responses.
+   *
+   * @param mdOrder - Order ID returned from register
+   * @param languageOverride - Optional language override
+   * @returns Order status response with payment details
+   *
+   * @example
+   * ```typescript
+   * const status = await client.getOrderStatus(orderId);
+   * if (status.isPaid()) {
+   *   console.log('Payment completed!');
+   * } else {
+   *   console.log('Status:', interpretOrderStatus(status.orderStatus));
+   * }
+   * ```
+   */
+  getOrderStatus(
+    mdOrder: string,
+    languageOverride?: SatimLanguage
+  ): Promise<ConfirmOrderResponse>;
+
+  /**
    * Refunds a completed transaction
    *
    * @param orderId - Order ID to refund
@@ -86,6 +113,7 @@ export function createSatimClient(config: SatimConfig): SatimClient {
   return {
     register: (params) => registerOrder(resolved, params),
     confirm: (mdOrder, lang) => confirmOrder(resolved, mdOrder, lang),
+    getOrderStatus: (mdOrder, lang) => confirmOrder(resolved, mdOrder, lang),
     refund: (orderId, amountDzd, lang) =>
       refundOrder(resolved, orderId, amountDzd, lang),
   };

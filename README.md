@@ -1,19 +1,17 @@
 # @bakissation/satim
 
-Production-grade TypeScript SDK for the Satim (SATIM-IPAY) payment gateway in Algeria.
+A **production-grade TypeScript SDK** for the [SATIM](https://www.satim.dz) (SATIM-IPAY) payment gateway — accept **CIB** and **Edahabia** card payments in Algeria with full type safety, zero runtime dependencies, and a security-first design.
 
-## Features
+[![npm](https://img.shields.io/npm/v/@bakissation/satim?label=npm&color=cb3837)](https://www.npmjs.com/package/@bakissation/satim)
+[![CI](https://github.com/bakissation/satim-ts/actions/workflows/ci.yml/badge.svg)](https://github.com/bakissation/satim-ts/actions/workflows/ci.yml)
+[![license](https://img.shields.io/npm/l/@bakissation/satim?color=blue)](./LICENSE)
 
-- Full TypeScript support with strict types
-- ESM and CommonJS builds
-- Minimal dependencies (uses native `fetch`)
-- Secure by default: credentials never logged, TLS always enforced
-- Fully configurable via environment variables
-- Comprehensive error handling
-- Amount conversion utilities (supports `number`, `string`, and `bigint`)
-- Pluggable fetch and middleware hooks for custom integrations
-- Idempotency key support to prevent duplicate orders
-- Custom logger support for integration with logging frameworks
+- 💳 **CIB & Edahabia** — register a payment, check its status, and refund — the full SATIM order lifecycle behind one typed client.
+- 🔒 **Secure by default** — credentials are never logged, TLS is always enforced, requests go over **POST**, and idempotency keys prevent double charges.
+- 🧩 **Type-safe & zero-dependency** — strict TypeScript types for every request and response; uses native `fetch`; ships both **ESM and CommonJS**.
+- 🛠️ **Production-ready** — typed error classes, amount precision (`number` / `string` / `bigint`), pluggable fetch + middleware hooks, and adapters for any logger.
+
+> 📖 **[Read the case study →](https://berkati.xyz/case-studies/satim-ts-payments-sdk/)** — why this SDK exists, and how it turns SATIM integration from hours of hand-rolled HTTP into minutes.
 
 ## Installation
 
@@ -21,89 +19,67 @@ Production-grade TypeScript SDK for the Satim (SATIM-IPAY) payment gateway in Al
 npm install @bakissation/satim
 ```
 
-## Quick Start
+Requires **Node.js ≥ 18**. No runtime dependencies.
 
-### 1. Set Up Environment Variables
-
-Copy the example environment file and configure your credentials:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your Satim credentials:
-
-```bash
-# Required
-SATIM_USERNAME=your_merchant_username
-SATIM_PASSWORD=your_merchant_password
-SATIM_TERMINAL_ID=E010XXXXXX
-
-# API URL (test or production)
-SATIM_API_URL=https://test2.satim.dz/payment/rest
-```
-
-### 2. Use the SDK
+## Quick start
 
 ```typescript
-import { createSatimClient, fromEnv } from '@bakissation/satim';
+import { createSatimClient, fromEnv, interpretOrderStatus } from '@bakissation/satim';
 
-// Load configuration from environment variables
+// Load configuration from SATIM_* environment variables
 const client = createSatimClient(fromEnv());
 
-// Register an order
-const registerResponse = await client.register({
+// 1) Register an order — redirect the customer to the returned payment page
+const order = await client.register({
   orderNumber: 'ORD001',
-  amount: 5000, // 5000 DZD
+  amount: 5000,                 // 5000 DZD
   returnUrl: 'https://yoursite.com/payment/success',
   failUrl: 'https://yoursite.com/payment/fail',
-  udf1: 'INV001', // Required: your reference
+  udf1: 'INV001',               // your reference (required)
 });
 
-if (registerResponse.isSuccessful()) {
-  // Redirect customer to payment page
-  console.log('Redirect to:', registerResponse.formUrl);
+if (order.isSuccessful()) {
+  console.log('Redirect to:', order.formUrl);
 }
 
-// After customer returns, confirm the payment (server-side)
-const confirmResponse = await client.confirm(registerResponse.orderId!);
+// 2) After the customer returns, check the status — ALWAYS server-side
+const status = await client.getOrderStatus(order.orderId!);
 
-if (confirmResponse.isPaid()) {
-  console.log('Payment successful!');
-  console.log('Order:', confirmResponse.orderNumber);
+if (status.isPaid()) {
+  console.log('Payment successful!', status.orderNumber);
+} else {
+  console.log('Status:', interpretOrderStatus(status.orderStatus));
 }
 
-// Refund a transaction
-const refundResponse = await client.refund('ORDER_ID', 5000);
-
-if (refundResponse.isSuccessful()) {
-  console.log('Refund processed');
-}
+// 3) Refund a completed transaction
+const refund = await client.refund(order.orderId!, 5000);
+if (refund.isSuccessful()) console.log('Refund processed');
 ```
 
-## Environment Variables Reference
+> Configure via environment variables (recommended) or pass config explicitly — see [Configuration](#configuration). Never hardcode merchant credentials.
 
-All configuration can be set via environment variables with the `SATIM_` prefix.
+## Configuration
 
-### Required Variables
+All configuration can be loaded from environment variables (the `SATIM_` prefix is the default; pass a custom one to `fromEnv({ prefix: 'PAYMENT_' })`).
+
+### Required
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `SATIM_USERNAME` | Merchant login from Satim | `merchant_user` |
-| `SATIM_PASSWORD` | Merchant password from Satim | `secure_password` |
-| `SATIM_TERMINAL_ID` | Terminal ID assigned by bank | `E010XXXXXX` |
+| `SATIM_USERNAME` | Merchant login from SATIM | `merchant_user` |
+| `SATIM_PASSWORD` | Merchant password from SATIM | `secure_password` |
+| `SATIM_TERMINAL_ID` | Terminal ID assigned by the bank | `E010XXXXXX` |
 
-### API Configuration
+### API endpoint
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `SATIM_API_URL` | API base URL | `https://test2.satim.dz/payment/rest` |
 
-**Available API URLs:**
 - **Test**: `https://test2.satim.dz/payment/rest`
 - **Production**: `https://satim.dz/payment/rest`
 
-### Optional Variables
+### Optional
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -113,20 +89,11 @@ All configuration can be set via environment variables with the `SATIM_` prefix.
 | `SATIM_HTTP_TIMEOUT_MS` | Request timeout (ms) | `30000` |
 | `SATIM_HTTP_CONNECT_TIMEOUT_MS` | Connection timeout (ms) | `10000` |
 | `SATIM_LOG_LEVEL` | Log level (`debug`, `info`, `warn`, `error`) | `info` |
-| `SATIM_LOG_DEV` | Enable dev logging | `true` (if NODE_ENV !== production) |
+| `SATIM_LOG_DEV` | Enable dev logging | `true` (when `NODE_ENV !== production`) |
 
-> **Note:** TLS is always enforced for security. The `SATIM_HTTP_VERIFY_SSL` environment variable has been removed.
+> **TLS is always enforced** for security and is not configurable.
 
-### Custom Prefix
-
-You can use a custom prefix for environment variables:
-
-```typescript
-// Use PAYMENT_ prefix instead of SATIM_
-const config = fromEnv({ prefix: 'PAYMENT_' });
-```
-
-## Manual Configuration
+### Manual configuration
 
 For cases where environment variables aren't suitable:
 
@@ -140,154 +107,31 @@ const client = createSatimClient({
   apiBaseUrl: API_BASE_URLS.PRODUCTION, // or API_BASE_URLS.TEST
   language: 'fr',
   currency: '012',
-  http: {
-    method: 'POST',
-    timeoutMs: 30000,
-  },
-  logger: {
-    enableDevLogging: false,
-    level: 'warn',
-  },
+  http: { method: 'POST', timeoutMs: 30000 },
+  logger: { enableDevLogging: false, level: 'warn' },
 });
 ```
 
-## Advanced Configuration
+## API reference
 
-### Custom Fetch Function
-
-Provide a custom fetch function for advanced HTTP handling (e.g., proxies, custom TLS, testing):
-
-```typescript
-import { createSatimClient } from '@bakissation/satim';
-
-const client = createSatimClient({
-  userName: 'your_username',
-  password: 'your_password',
-  terminalId: 'E010XXXXXX',
-  apiBaseUrl: 'https://satim.dz/payment/rest',
-  http: {
-    fetch: async (url, init) => {
-      // Custom fetch implementation
-      console.log('Requesting:', url);
-      return fetch(url, {
-        ...init,
-        // Add custom headers, proxy settings, etc.
-      });
-    },
-  },
-});
-```
-
-### Middleware Hooks
-
-Use `onRequest` and `onResponse` hooks for logging, metrics, or debugging:
-
-```typescript
-const client = createSatimClient({
-  userName: 'your_username',
-  password: 'your_password',
-  terminalId: 'E010XXXXXX',
-  apiBaseUrl: 'https://satim.dz/payment/rest',
-  http: {
-    onRequest: (endpoint, params) => {
-      console.log(`[REQUEST] ${endpoint}`, params);
-      // Note: sensitive data is automatically redacted
-    },
-    onResponse: (endpoint, response) => {
-      console.log(`[RESPONSE] ${endpoint}`, response);
-    },
-  },
-});
-```
-
-### Custom Logger
-
-Integrate with your logging framework (winston, pino, bunyan, etc.):
-
-```typescript
-import { createSatimClient, SatimLogger } from '@bakissation/satim';
-import pino from 'pino';
-
-const pinoLogger = pino({ level: 'debug' });
-
-// Create a SatimLogger adapter
-const customLogger: SatimLogger = {
-  debug: (obj, msg) => pinoLogger.debug(obj, msg),
-  info: (obj, msg) => pinoLogger.info(obj, msg),
-  warn: (obj, msg) => pinoLogger.warn(obj, msg),
-  error: (obj, msg) => pinoLogger.error(obj, msg),
-};
-
-const client = createSatimClient({
-  userName: 'your_username',
-  password: 'your_password',
-  terminalId: 'E010XXXXXX',
-  apiBaseUrl: 'https://satim.dz/payment/rest',
-  logger: {
-    customLogger,
-  },
-});
-```
-
-#### Rotating Logger Example
-
-For production environments with log rotation:
-
-```typescript
-import { createSatimClient, SatimLogger } from '@bakissation/satim';
-import winston from 'winston';
-import 'winston-daily-rotate-file';
-
-const transport = new winston.transports.DailyRotateFile({
-  filename: 'logs/satim-%DATE%.log',
-  datePattern: 'YYYY-MM-DD',
-  maxSize: '20m',
-  maxFiles: '14d',
-});
-
-const winstonLogger = winston.createLogger({
-  transports: [transport],
-});
-
-const customLogger: SatimLogger = {
-  debug: (obj, msg) => winstonLogger.debug(msg || '', obj),
-  info: (obj, msg) => winstonLogger.info(msg || '', obj),
-  warn: (obj, msg) => winstonLogger.warn(msg || '', obj),
-  error: (obj, msg) => winstonLogger.error(msg || '', obj),
-};
-
-const client = createSatimClient({
-  userName: process.env.SATIM_USERNAME!,
-  password: process.env.SATIM_PASSWORD!,
-  terminalId: process.env.SATIM_TERMINAL_ID!,
-  apiBaseUrl: 'https://satim.dz/payment/rest',
-  logger: { customLogger },
-});
-```
-
-## API Reference
-
-### Register Order
+### Register order
 
 Creates a new payment order.
 
 ```typescript
 const response = await client.register({
-  orderNumber: 'ORD001',     // Required: unique order ID (max 10 chars)
-  amount: 5000,               // Required: amount in DZD (min 50 DZD). Also accepts string or bigint (e.g., 5000n)
-  returnUrl: 'https://...',   // Required: success redirect URL
-  failUrl: 'https://...',     // Optional: failure redirect URL
-  description: 'Order desc',  // Optional: order description
-  udf1: 'REF001',            // Required: your reference
-  udf2: 'Extra1',            // Optional: additional data
-  udf3: 'Extra2',            // Optional
-  udf4: 'Extra3',            // Optional
-  udf5: 'Extra4',            // Optional
-  language: 'fr',            // Optional: override default language
-  currency: '012',           // Optional: override default currency
-  fundingTypeIndicator: 'CP', // Optional: 'CP' or '698' for bill payment (top-level param)
-  idempotencyKey: 'uuid-...',  // Optional: unique key to prevent duplicate orders
-  additionalParams: {         // Optional: custom params for jsonParams
+  orderNumber: 'ORD001',      // Required: unique order ID (max 10 chars)
+  amount: 5000,                // Required: amount in DZD (min 50). Accepts number, string, or bigint
+  returnUrl: 'https://...',    // Required: success redirect URL
+  failUrl: 'https://...',      // Optional: failure redirect URL
+  description: 'Order desc',   // Optional: order description
+  udf1: 'REF001',              // Required: your reference
+  udf2: 'Extra1',              // Optional: additional data (udf2–udf5)
+  language: 'fr',              // Optional: override default language
+  currency: '012',             // Optional: override default currency
+  fundingTypeIndicator: 'CP',  // Optional: 'CP' or '698' (bill payment)
+  idempotencyKey: 'uuid-...',  // Optional: prevents duplicate orders (sent as externalRequestId)
+  additionalParams: {          // Optional: custom fields merged into jsonParams
     customField: 'value',
   },
 });
@@ -298,150 +142,118 @@ if (response.isSuccessful()) {
 }
 ```
 
-#### Idempotency Key
+#### Idempotency key
 
-Use `idempotencyKey` to prevent duplicate order creation. Pass a unique value (e.g., UUID) for each order request. The SDK sends this as `externalRequestId` to the Satim API.
+Pass a unique `idempotencyKey` (e.g. a UUID) per order to prevent duplicate creation on retries. The SDK forwards it to SATIM as `externalRequestId`.
 
 ```typescript
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 
-const response = await client.register({
+await client.register({
   orderNumber: 'ORD001',
   amount: 5000,
   returnUrl: 'https://yoursite.com/success',
   udf1: 'INV001',
-  idempotencyKey: randomUUID(), // Prevents duplicate orders on retry
+  idempotencyKey: randomUUID(),
 });
 ```
 
-#### Additional Parameters
+### Get order status
 
-Use `additionalParams` to include merchant-specific fields in the `jsonParams` payload:
-
-```typescript
-const response = await client.register({
-  orderNumber: 'ORD001',
-  amount: 5000,
-  returnUrl: 'https://yoursite.com/success',
-  udf1: 'INV001',
-  additionalParams: {
-    merchantRef: 'M123',
-    customerId: 'C456',
-  },
-});
-```
-
-### Confirm Order
-
-Confirms a payment after customer redirect. **Always call this server-side.**
+Checks the current status of an order — use this after the customer redirect to verify payment. **Always call this server-side.**
 
 ```typescript
-const response = await client.confirm(orderId, 'fr');
+import { interpretOrderStatus } from '@bakissation/satim';
+
+const response = await client.getOrderStatus(orderId, 'fr');
 
 if (response.isSuccessful()) {
-  console.log('Confirmation successful');
+  console.log('Status:', interpretOrderStatus(response.orderStatus));
 
   if (response.isPaid()) {
     console.log('Order Status:', response.orderStatus); // 2 = paid
     console.log('Amount:', response.amount);
-    console.log('Card:', response.pan); // Masked: 6280****7215
-
-    // Additional fields available in normalized response
+    console.log('Card:', response.pan);                 // Masked: 6280****7215
     console.log('Cardholder:', response.cardholderName);
     console.log('Approval Code:', response.approvalCode);
-    console.log('Authorization ID:', response.authorizationResponseId);
-    console.log('Deposit Amount:', response.depositAmount);
-    console.log('Currency:', response.currency);
-    console.log('Description:', response.description);
-    console.log('Client IP:', response.ip);
-    console.log('Client ID:', response.clientId);
-    console.log('Binding ID:', response.bindingId);
-    console.log('Payment Account Ref:', response.paymentAccountReference);
-    console.log('Extra Params:', response.params);
   }
 }
 
-// Access raw response for all fields
+// Full raw payload is always available
 console.log(response.raw);
 ```
 
-### Refund Order
+`interpretOrderStatus(code)` converts any SATIM order status code into a human-readable description (and handles `null` / unknown codes gracefully).
+
+#### Confirm order (alias)
+
+`client.confirm()` is an alias of `getOrderStatus()` — both call the same SATIM endpoint (`acknowledgeTransaction.do`) and return identical responses. Use whichever name reads better in your code.
+
+```typescript
+const response = await client.confirm(orderId, 'fr');
+if (response.isPaid()) console.log('Payment successful!');
+```
+
+### Refund order
 
 Refunds a completed transaction.
 
 ```typescript
 const response = await client.refund(orderId, 5000, 'fr');
-
-if (response.isSuccessful()) {
-  console.log('Refund successful');
-}
+if (response.isSuccessful()) console.log('Refund successful');
 ```
 
-## Amount Handling
+## Amount handling
 
-Amounts are provided in DZD and automatically converted to minor units (x100). The SDK accepts `number`, `string`, or `bigint` values.
+Amounts are given in DZD and converted to minor units (×100) automatically. Helpers accept `number`, `string`, or `bigint`.
 
 ```typescript
 import { toMinorUnits, fromMinorUnits } from '@bakissation/satim';
 
-// Conversion utilities - supports number, string, and bigint
 toMinorUnits(5000);     // "500000"
 toMinorUnits('806.5');  // "80650"
-toMinorUnits('50.01');  // "5001"
-toMinorUnits(5000n);    // "500000" (bigint support)
-
-fromMinorUnits(500000); // 5000
+toMinorUnits(5000n);    // "500000" (bigint)
 fromMinorUnits(80650);  // 806.5
 
-// Validation rules:
-// - Minimum: 50 DZD
-// - Maximum 2 decimal places (for number/string)
-// - Non-negative
+// Rules: min 50 DZD · max 2 decimal places · non-negative
 ```
 
-### BigInt Support
+For large amounts requiring precise integer arithmetic, pass `bigint` directly to `register()` / `refund()`.
 
-For applications dealing with large amounts or requiring precise integer arithmetic, use `bigint`:
+## Order status codes
 
 ```typescript
-// Register with bigint amount
-const response = await client.register({
-  orderNumber: 'ORD001',
-  amount: 1000000n, // 1,000,000 DZD as bigint
-  returnUrl: 'https://yoursite.com/success',
-  udf1: 'LARGE_ORDER',
-});
+import { OrderStatus, interpretOrderStatus } from '@bakissation/satim';
 
-// Refund with bigint
-await client.refund(orderId, 500000n); // 500,000 DZD as bigint
+if (response.orderStatus === OrderStatus.DEPOSITED) {
+  // Payment completed
+}
+
+interpretOrderStatus(2); // "Payment completed successfully"
+
+// OrderStatus.REGISTERED_NOT_PAID (0) · UNKNOWN_DECLINE (-1) · APPROVED (1)
+// DEPOSITED (2, paid) · REVERSED (3) · REFUNDED (4) · DECLINED (6) · …
 ```
 
-## Error Handling
+## Error handling
+
+Every failure throws a typed error extending `SatimError`:
 
 ```typescript
 import {
-  createSatimClient,
-  SatimError,
-  ConfigError,
-  ValidationError,
-  HttpError,
-  TimeoutError,
-  SatimApiError,
-  mapSatimErrorCode,
+  SatimError, ConfigError, ValidationError,
+  HttpError, TimeoutError, SatimApiError, mapSatimErrorCode,
 } from '@bakissation/satim';
 
 try {
-  const response = await client.register({...});
+  await client.register({ /* ... */ });
 } catch (error) {
   if (error instanceof ValidationError) {
-    console.log('Validation failed:', error.message);
-    console.log('Code:', error.code); // e.g., 'INVALID_AMOUNT'
+    console.log('Validation failed:', error.message, error.code);
   } else if (error instanceof SatimApiError) {
-    console.log('API error:', error.message);
-    console.log('Satim code:', error.satimErrorCode);
-    console.log('Description:', mapSatimErrorCode('register', error.satimErrorCode));
+    console.log('API error:', mapSatimErrorCode('register', error.satimErrorCode));
   } else if (error instanceof TimeoutError) {
-    console.log('Timeout after:', error.timeoutMs, 'ms');
+    console.log('Timeout after', error.timeoutMs, 'ms');
   } else if (error instanceof HttpError) {
     console.log('HTTP error:', error.httpStatus);
   } else if (error instanceof ConfigError) {
@@ -450,60 +262,80 @@ try {
 }
 ```
 
-### Satim Error Codes
+### SATIM error codes
 
-| Code | Register | Confirm | Refund |
-|------|----------|---------|--------|
+| Code | Register | Confirm / Status | Refund |
+|------|----------|------------------|--------|
 | 0 | Success | Success | Success |
-| 1 | Order already processed | - | - |
-| 2 | - | Payment credentials error | - |
-| 3 | Unknown currency | - | - |
-| 4 | Required param missing | - | - |
-| 5 | Invalid parameter | Access denied | Access denied/Invalid amount |
-| 6 | - | Unregistered order | Unregistered order |
+| 1 | Order already processed | – | – |
+| 2 | – | Payment credentials error | – |
+| 3 | Unknown currency | – | – |
+| 4 | Required param missing | – | – |
+| 5 | Invalid parameter | Access denied | Access denied / Invalid amount |
+| 6 | – | Unregistered order | Unregistered order |
 | 7 | System error | System error | System error |
-| 14 | Invalid paymentway | - | - |
+| 14 | Invalid paymentway | – | – |
 
-## Order Status Codes
+## Advanced configuration
+
+<details>
+<summary><strong>Custom fetch, middleware hooks, and loggers</strong></summary>
+
+### Custom fetch
 
 ```typescript
-import { OrderStatus } from '@bakissation/satim';
-
-if (response.orderStatus === OrderStatus.DEPOSITED) {
-  // Payment completed
-}
-
-// Available statuses:
-OrderStatus.REGISTERED_NOT_PAID  // 0
-OrderStatus.UNKNOWN_DECLINE      // -1
-OrderStatus.APPROVED             // 1
-OrderStatus.DEPOSITED            // 2 (payment successful)
-OrderStatus.REVERSED             // 3
-OrderStatus.REFUNDED             // 4
-OrderStatus.DECLINED             // 6
+const client = createSatimClient({
+  userName, password, terminalId, apiBaseUrl,
+  http: {
+    fetch: async (url, init) => fetch(url, { ...init /* proxy, custom TLS, etc. */ }),
+  },
+});
 ```
 
-## Security Best Practices
+### Middleware hooks
 
-1. **Never log credentials**: The SDK never logs passwords, usernames, terminal IDs, or card data.
+```typescript
+const client = createSatimClient({
+  userName, password, terminalId, apiBaseUrl,
+  http: {
+    onRequest: (endpoint, params) => console.log(`[REQ] ${endpoint}`, params),  // sensitive data is auto-redacted
+    onResponse: (endpoint, response) => console.log(`[RES] ${endpoint}`, response),
+  },
+});
+```
 
-2. **Always verify server-side**: Never trust client-side payment callbacks. Always call `confirm()` from your server.
+### Custom logger (pino / winston / …)
 
-3. **Use POST method**: The default `POST` method prevents credentials from appearing in URLs and logs. Using `GET` will log a warning.
+```typescript
+import { createSatimClient, SatimLogger } from '@bakissation/satim';
+import pino from 'pino';
 
-4. **TLS always enforced**: The SDK always verifies TLS certificates. This is not configurable for security reasons.
+const log = pino({ level: 'debug' });
+const customLogger: SatimLogger = {
+  debug: (o, m) => log.debug(o, m),
+  info: (o, m) => log.info(o, m),
+  warn: (o, m) => log.warn(o, m),
+  error: (o, m) => log.error(o, m),
+};
 
-5. **Environment variables**: Store credentials in environment variables, never in code. See `.env.example`.
+const client = createSatimClient({ userName, password, terminalId, apiBaseUrl, logger: { customLogger } });
+```
 
-6. **Never commit `.env`**: Add `.env` to your `.gitignore`.
+</details>
 
-7. **Disable dev logging in production**: Set `NODE_ENV=production` or `SATIM_LOG_DEV=false`.
+## Security best practices
 
-8. **Use idempotency keys**: Use `idempotencyKey` in `register()` to prevent duplicate orders on retries.
+1. **Verify server-side** — never trust client-side callbacks; always call `getOrderStatus()` / `confirm()` from your server.
+2. **Keep POST** — the default keeps credentials out of URLs and logs (`GET` logs a warning).
+3. **Credentials in env, never in code** — see [`.env.example`](./.env.example), and never commit `.env`.
+4. **Use idempotency keys** to avoid double charges on retries.
+5. **Disable dev logging in production** — set `NODE_ENV=production` or `SATIM_LOG_DEV=false`.
 
-## Test Cards
+The SDK never logs passwords, usernames, terminal IDs, or card data, and always enforces TLS. Found a vulnerability? See [SECURITY.md](./SECURITY.md) — please don't open a public issue.
 
-For testing in the sandbox environment (`test2.satim.dz`):
+## Test cards
+
+For the sandbox environment (`test2.satim.dz`):
 
 | Card Number | CVV2 | Expiry | Password | Status |
 |-------------|------|--------|----------|--------|
@@ -514,43 +346,28 @@ For testing in the sandbox environment (`test2.satim.dz`):
 | 6280581110006514 | 205 | 01/2027 | 123456 | Incorrect CVV2 |
 | 6280580610061011 | 992 | 01/2027 | 123456 | Valid credit card |
 
-## TypeScript Support
+## TypeScript
 
-Full type definitions are included:
+Full type definitions are bundled:
 
 ```typescript
 import type {
-  SatimConfig,
-  SatimClient,
-  RegisterOrderParams,
-  RegisterOrderResponse,
-  ConfirmOrderResponse,
-  RefundOrderResponse,
-  SatimLanguage,
-  OrderStatusCode,
+  SatimConfig, SatimClient,
+  RegisterOrderParams, RegisterOrderResponse,
+  ConfirmOrderResponse, RefundOrderResponse,
+  SatimLanguage, OrderStatusCode,
 } from '@bakissation/satim';
 ```
 
-## Requirements
+## Contributing
 
-- Node.js >= 18
-- TypeScript >= 5 (for development)
+Issues and PRs are welcome — please read [CONTRIBUTING.md](./CONTRIBUTING.md) and the [Code of Conduct](./CODE_OF_CONDUCT.md) first. Releases are automated from [Conventional Commits](https://www.conventionalcommits.org/) via semantic-release; **don't bump the version or edit the changelog by hand**.
+
+## Credits
+
+Built and maintained by **Abdelbaki Berkati** — [berkati.xyz](https://berkati.xyz) · [@bakissation](https://github.com/bakissation).
+📖 [Read the case study →](https://berkati.xyz/case-studies/satim-ts-payments-sdk/)
 
 ## License
 
-MIT - Abdelbaki Berkati
-
-## Contributing
-
-Contributions are welcome! Please ensure tests pass:
-
-```bash
-npm test
-npm run build
-```
-
-## Author
-
-**Abdelbaki Berkati** — [berkati.xyz](https://berkati.xyz) · [@bakissation](https://github.com/bakissation)
-
-[Read the case study →](https://berkati.xyz/case-studies/satim-ts-payments-sdk/)
+[MIT](./LICENSE)

@@ -32,7 +32,7 @@ export type {
   OrderStatusCode,
 } from './types.js';
 
-export { OrderStatus } from './types.js';
+export { OrderStatus, interpretOrderStatus } from './types.js';
 
 // Errors
 export {

@@ -35,9 +35,6 @@ jobs:
               echo "nothing to back-merge into $target (already in sync or PR exists)"
               continue
             fi
-            # The PR head is main's HEAD, which already passed ci on main, so the PR
-            # is usually immediately mergeable — try a direct merge first, then fall
-            # back to auto-merge for the case where checks are still pending.
             if gh pr merge "$url" --repo "$REPO" --merge; then
               echo "merged: $url"
             elif gh pr merge "$url" --repo "$REPO" --auto --merge; then

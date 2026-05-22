@@ -337,3 +337,41 @@ export const OrderStatus = {
 } as const;
 
 export type OrderStatusCode = (typeof OrderStatus)[keyof typeof OrderStatus];
+
+/**
+ * Human-readable descriptions for each order status code
+ */
+const ORDER_STATUS_DESCRIPTIONS: Record<OrderStatusCode, string> = {
+  [OrderStatus.REGISTERED_NOT_PAID]: 'Order registered but not paid',
+  [OrderStatus.UNKNOWN_DECLINE]: 'Unknown decline',
+  [OrderStatus.APPROVED]: 'Approved (pre-authorization held)',
+  [OrderStatus.DEPOSITED]: 'Payment completed successfully',
+  [OrderStatus.REVERSED]: 'Authorization reversed',
+  [OrderStatus.REFUNDED]: 'Transaction refunded',
+  [OrderStatus.DECLINED]: 'Payment declined',
+  [OrderStatus.CARD_ADDED]: 'Card added to binding',
+  [OrderStatus.CARD_UPDATED]: 'Card binding updated',
+  [OrderStatus.CARD_VERIFIED]: 'Card verified',
+  [OrderStatus.RECURRING_ADDED]: 'Recurring payment added',
+  [OrderStatus.DEBITED]: 'Amount debited',
+};
+
+/**
+ * Interprets an order status code and returns a human-readable description
+ *
+ * @param code - The order status code from the API response
+ * @returns Human-readable description of the status
+ *
+ * @example
+ * ```typescript
+ * const status = await client.getOrderStatus(orderId);
+ * console.log(interpretOrderStatus(status.orderStatus));
+ * // Output: "Payment completed successfully" (for status 2)
+ * ```
+ */
+export function interpretOrderStatus(code: number | null): string {
+  if (code === null) {
+    return 'Unknown status';
+  }
+  return ORDER_STATUS_DESCRIPTIONS[code as OrderStatusCode] ?? `Unknown status code: ${code}`;
+}

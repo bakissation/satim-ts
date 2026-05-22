@@ -108,7 +108,7 @@ function resolveConfig(config: SatimConfig): ResolvedConfig {
   }
 
   // Determine HTTP method - warn if GET is used and default to POST
-  let httpMethod: 'POST' | 'GET' = config.http?.method ?? DEFAULTS.HTTP_METHOD;
+  const httpMethod: 'POST' | 'GET' = config.http?.method ?? DEFAULTS.HTTP_METHOD;
   if (httpMethod === 'GET') {
     logger?.warn(
       { configuredMethod: 'GET', recommendedMethod: 'POST' },

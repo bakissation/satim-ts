@@ -1,8 +1,8 @@
 {
   "name": "@bakissation/satim",
-  "version": "1.1.0",
-  "description": "Production-grade TypeScript SDK for Satim (SATIM-IPAY) payment gateway",
-  "author": "Abdelbaki Berkati <bakissation@github>",
+  "version": "0.0.0-semantically-released",
+  "description": "Production-grade TypeScript SDK for the SATIM (SATIM-IPAY) payment gateway in Algeria — CIB & Edahabia card payments. Type-safe, secure, zero runtime dependencies.",
+  "author": "Abdelbaki Berkati (@bakissation)",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -35,31 +35,45 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint src --ext .ts",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build && npm run test"
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
+    "@eslint/js": "^9.18.0",
     "@types/node": "^20.10.0",
-    "@typescript-eslint/eslint-plugin": "^6.21.0",
-    "@typescript-eslint/parser": "^6.21.0",
-    "eslint": "^8.56.0",
+    "eslint": "^9.18.0",
+    "semantic-release": "^24.2.0",
     "tsup": "^8.0.1",
     "typescript": "^5.3.3",
+    "typescript-eslint": "^8.20.0",
     "undici": "^6.6.0",
     "vitest": "^1.2.0"
   },
   "keywords": [
     "satim",
+    "satim-ipay",
     "payment",
+    "payment-gateway",
     "gateway",
     "algeria",
     "cib",
+    "edahabia",
     "dzd",
-    "e-commerce"
+    "e-commerce",
+    "typescript",
+    "sdk"
   ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/bakissation/satim-ts"
-  }
+    "url": "git+https://github.com/bakissation/satim-ts.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bakissation/satim-ts/issues"
+  },
+  "homepage": "https://github.com/bakissation/satim-ts#readme"
 }

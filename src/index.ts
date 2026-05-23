@@ -46,7 +46,7 @@ export {
 } from './errors.js';
 export type { SatimErrorKind } from './errors.js';
 
-// Amount utilities
+// Amount utilities (amount handling is delegated to @bakissation/dinar)
 export { toMinorUnits, fromMinorUnits, validateAmount } from './amount.js';
 
 // Constants

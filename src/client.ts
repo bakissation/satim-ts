@@ -15,6 +15,7 @@ import type {
 import { DEFAULTS, ENDPOINTS, VALIDATION } from './constants.js';
 import { ValidationError, SatimApiError, mapSatimErrorCode } from './errors.js';
 import { toMinorUnits } from './amount.js';
+import type { Dinar } from '@bakissation/dinar';
 import { makeRequest } from './http.js';
 
 /**
@@ -72,13 +73,13 @@ export interface SatimClient {
    * Refunds a completed transaction
    *
    * @param orderId - Order ID to refund
-   * @param amountDzd - Amount to refund in DZD (required). Accepts number, string, or bigint.
+   * @param amountDzd - Amount to refund in DZD (required). Accepts number, string, bigint, or a `Dinar`.
    * @param languageOverride - Optional language override
    * @returns Refund response
    */
   refund(
     orderId: string,
-    amountDzd: number | string | bigint,
+    amountDzd: number | string | bigint | Dinar,
     languageOverride?: SatimLanguage
   ): Promise<RefundOrderResponse>;
 }
@@ -407,7 +408,7 @@ async function confirmOrder(
 async function refundOrder(
   config: ResolvedConfig,
   orderId: string,
-  amountDzd: number | string | bigint,
+  amountDzd: number | string | bigint | Dinar,
   languageOverride?: SatimLanguage
 ): Promise<RefundOrderResponse> {
   if (!orderId || typeof orderId !== 'string') {

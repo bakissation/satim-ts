@@ -17,7 +17,7 @@ src/
 └── types.ts      # All types + OrderStatus enum + interpretOrderStatus
 ```
 
-Design constraints: **zero runtime dependencies** (native `fetch`), **strict TypeScript**, **ESM + CJS** output via tsup, and **no secret leakage** in logs or errors.
+Design constraints: **one runtime dependency** — `@bakissation/dinar` for amounts (the shared DZD money type); native `fetch` for HTTP; **strict TypeScript**, **ESM + CJS** output via tsup, and **no secret leakage** in logs or errors.
 
 ## Request lifecycle
 

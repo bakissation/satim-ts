@@ -1,6 +1,6 @@
 # @bakissation/satim
 
-A **production-grade TypeScript SDK** for the [SATIM](https://www.satim.dz) (SATIM-IPAY) payment gateway — accept **CIB** and **Edahabia** card payments in Algeria with full type safety, zero runtime dependencies, and a security-first design.
+A **production-grade TypeScript SDK** for the [SATIM](https://www.satim.dz) (SATIM-IPAY) payment gateway — accept **CIB** and **Edahabia** card payments in Algeria with full type safety, a shared `Dinar` money type, and a security-first design.
 
 [![npm](https://img.shields.io/npm/v/@bakissation/satim?label=npm&color=cb3837)](https://www.npmjs.com/package/@bakissation/satim)
 [![CI](https://github.com/bakissation/satim-ts/actions/workflows/ci.yml/badge.svg)](https://github.com/bakissation/satim-ts/actions/workflows/ci.yml)
@@ -8,8 +8,8 @@ A **production-grade TypeScript SDK** for the [SATIM](https://www.satim.dz) (SAT
 
 - 💳 **Full order lifecycle** — register a payment, check its status, and refund — behind one typed client.
 - 🔒 **Secure by default** — credentials never logged, TLS always enforced, POST by default, idempotency keys.
-- 🧩 **Type-safe & zero-dependency** — strict types for every request/response; native `fetch`; **ESM + CommonJS**.
-- 🛠️ **Production-ready** — typed errors, amount precision (`number`/`string`/`bigint`), pluggable fetch + middleware hooks, logger adapters.
+- 🧩 **Type-safe & dinar-backed** — strict types for every request/response; native `fetch`; **ESM + CommonJS**.
+- 🛠️ **Production-ready** — typed errors, amount precision via [`@bakissation/dinar`](https://www.npmjs.com/package/@bakissation/dinar) (also accepts `number`/`string`/`bigint`), pluggable fetch + middleware hooks, logger adapters.
 
 > 📖 **[Read the case study →](https://berkati.xyz/case-studies/satim-ts-payments-sdk/)** — why this SDK exists, and how it turns SATIM integration from hours of hand-rolled HTTP into minutes.
 
@@ -19,7 +19,7 @@ A **production-grade TypeScript SDK** for the [SATIM](https://www.satim.dz) (SAT
 npm install @bakissation/satim
 ```
 
-Requires **Node.js ≥ 18**. No runtime dependencies.
+Requires **Node.js ≥ 18**. One runtime dependency: [`@bakissation/dinar`](https://www.npmjs.com/package/@bakissation/dinar) (the shared DZD money type), installed automatically.
 
 ## Quick start
 

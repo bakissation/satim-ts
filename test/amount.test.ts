@@ -1,6 +1,23 @@
 import { describe, it, expect } from 'vitest';
+import { Dinar } from '@bakissation/dinar';
 import { toMinorUnits, fromMinorUnits, validateAmount } from '../src/amount.js';
 import { ValidationError } from '../src/errors.js';
+
+describe('Dinar input (shared money type)', () => {
+  it('accepts a Dinar amount', () => {
+    expect(toMinorUnits(Dinar.fromDinars(5000))).toBe('500000');
+    expect(toMinorUnits(Dinar.fromDinars(806.5))).toBe('80650');
+  });
+  it('enforces the 50 DZD minimum on a Dinar', () => {
+    expect(() => toMinorUnits(Dinar.fromDinars(49))).toThrow('at least 50 DZD');
+  });
+  it('validateAmount accepts a Dinar', () => {
+    expect(validateAmount(Dinar.fromDinars(5000))).toBe(true);
+  });
+  it('fromMinorUnits round-trips via dinar', () => {
+    expect(fromMinorUnits('80650')).toBe(806.5);
+  });
+});
 
 describe('toMinorUnits', () => {
   describe('valid conversions', () => {
@@ -52,7 +69,7 @@ describe('toMinorUnits', () => {
   describe('validation errors', () => {
     it('should throw for empty string', () => {
       expect(() => toMinorUnits('')).toThrow(ValidationError);
-      expect(() => toMinorUnits('')).toThrow('Amount cannot be empty');
+      expect(() => toMinorUnits('')).toThrow('valid number');
     });
 
     it('should throw for whitespace only', () => {
@@ -73,9 +90,9 @@ describe('toMinorUnits', () => {
       expect(() => toMinorUnits(49)).toThrow('at least 50 DZD');
     });
 
-    it('should throw for amount with more than 2 decimal places', () => {
-      expect(() => toMinorUnits('100.123')).toThrow(ValidationError);
-      expect(() => toMinorUnits('100.123')).toThrow('2 decimal places');
+    it('rounds amounts with more than 2 decimals (delegated to dinar)', () => {
+      expect(toMinorUnits('100.123')).toBe('10012');
+      expect(toMinorUnits('100.126')).toBe('10013');
     });
 
     it('should throw for invalid format', () => {
@@ -83,8 +100,8 @@ describe('toMinorUnits', () => {
       expect(() => toMinorUnits('abc')).toThrow('valid number');
     });
 
-    it('should throw for amount with multiple decimal points', () => {
-      expect(() => toMinorUnits('100.50.25')).toThrow(ValidationError);
+    it('parses dinar separator grammar (last separator is the decimal)', () => {
+      expect(toMinorUnits('100.50.25')).toBe('1005025');
     });
 
     it('should throw for amount with letters mixed', () => {

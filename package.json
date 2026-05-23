@@ -1,7 +1,7 @@
 {
   "name": "@bakissation/satim",
   "version": "0.0.0-semantically-released",
-  "description": "Production-grade TypeScript SDK for the SATIM (SATIM-IPAY) payment gateway in Algeria — CIB & Edahabia card payments. Type-safe, secure, zero runtime dependencies.",
+  "description": "Production-grade TypeScript SDK for the SATIM (SATIM-IPAY) payment gateway in Algeria — CIB & Edahabia card payments. Type-safe, secure, built on @bakissation/dinar for amounts.",
   "author": "Abdelbaki Berkati (@bakissation)",
   "license": "MIT",
   "type": "module",
@@ -38,6 +38,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@bakissation/dinar": "^1.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",

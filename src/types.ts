@@ -1,3 +1,5 @@
+import type { Dinar } from '@bakissation/dinar';
+
 /**
  * Supported languages for Satim API
  */
@@ -128,8 +130,8 @@ export interface RegisterJsonParams {
 export interface RegisterOrderParams {
   /** Order number in the merchant's system - must be unique per transaction */
   orderNumber: string;
-  /** Amount in DZD (minimum 50 DZD) - will be converted to minor units. Accepts number, string, or bigint. */
-  amount: number | string | bigint;
+  /** Amount in DZD (minimum 50 DZD) - will be converted to minor units. Accepts number, string, bigint, or a `Dinar` from `@bakissation/dinar`. */
+  amount: number | string | bigint | Dinar;
   /** URL to redirect after successful payment */
   returnUrl: string;
   /** URL to redirect if payment failed */

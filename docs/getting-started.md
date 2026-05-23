@@ -6,7 +6,7 @@
 npm install @bakissation/satim
 ```
 
-Requires **Node.js ≥ 18**. No runtime dependencies.
+Requires **Node.js ≥ 18**. One runtime dependency: `@bakissation/dinar` (the shared DZD money type), installed automatically.
 
 ## Configure
 
